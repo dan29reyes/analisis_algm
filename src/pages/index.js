@@ -1,6 +1,5 @@
 import FadeInWhenVisible from "@/components/AnimatedComponent";
 import { Gitlab } from "lucide-react";
-import { useState } from "react";
 
 export default function Home() {
   const users = [
