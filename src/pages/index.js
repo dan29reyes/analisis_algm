@@ -17,16 +17,16 @@ export default function Home() {
       url: "Hamiltonian",
     },
     {
-      name: "Problema del Subconjunto",
-      description:
-        "Este proyecto implementa un algoritmo para resolver el problema del subconjunto, que busca determinar si existe un subconjunto de un conjunto dado que sume a un valor específico.",
-      url: "SubsetSum",
-    },
-    {
       name: "Coloración de Grafos",
       description:
         "Este proyecto implementa un algoritmo para resolver el problema de coloración de grafos, que busca asignar colores a los vértices de un grafo de manera que no haya dos vértices adyacentes del mismo color.",
       url: "GraphColoring",
+    },
+    {
+      name: "Problema del Subconjunto",
+      description:
+        "Este proyecto implementa un algoritmo para resolver el problema del subconjunto, que busca determinar si existe un subconjunto de un conjunto dado que sume a un valor específico.",
+      url: "SubsetSum",
     },
   ];
 
@@ -47,15 +47,17 @@ export default function Home() {
             algoritmos en diferentes escenarios.
           </p>
         </FadeInWhenVisible>
-        <div className="flex items-center gap-4 mt-6">
+        <div className="flex justify-center gap-4 mt-6">
           {projects.map((project, index) => (
             <FadeInWhenVisible key={index} delay={0.3 + index * 0.1}>
-              <div className="col-span-1 max-w-md w-full bg-gray-800 p-4 rounded-lg shadow-lg mt-4 hover:scale-105 transition-transform duration-300">
-                <h2 className="text-xl font-semibold">{project.name}</h2>
-                <p className="text-gray-400 mt-2">{project.description}</p>
+              <div className="col-span-1 flex flex-col justify-between max-w-md w-full bg-gray-800 p-4 rounded-lg shadow-lg mt-4 hover:scale-105 transition-transform duration-300 h-full">
+                <div className="flex flex-col">
+                  <h2 className="text-xl font-semibold">{project.name}</h2>
+                  <p className="text-gray-400 mt-2">{project.description}</p>
+                </div>
                 <a
                   href={`/${project.url}`}
-                  className="text-blue-400 hover:underline mt-2 inline-block"
+                  className="text-blue-400 hover:underline mt-auto inline-block"
                 >
                   Ver Proyecto
                 </a>
@@ -65,7 +67,7 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center pt-4 sm:pt-8">
+      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center pt-8 sm:pt-14">
         {users.map((user) => (
           <a
             className="flex items-center gap-2 hover:underline hover:underline-offset-4 animate-bounce"
