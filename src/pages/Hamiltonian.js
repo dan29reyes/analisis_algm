@@ -1,85 +1,108 @@
 import hamiltonianAccess from "@/pages/api/AccessPoints/hamiltonian-access";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Network } from "vis-network";
 
 export default function Hamiltonian() {
   const [vertex_count, setVertexCount] = useState(1);
   const [start_vertex, setStartVertex] = useState(0);
   const [hamiltonianInfo, setHamiltonianInfo] = useState(null);
   const [isApiLoading, setIsApiLoading] = useState(false);
-  const [isVisualizingPaths, setIsVisualizingPaths] = useState(false);
-  const [pathProgress, setPathProgress] = useState({});
   const [topPathsData, setTopPathsData] = useState([]);
-  const [lowestPath, setLowestPath] = useState(null);
+  const [displayedVertexCount, setDisplayedVertexCount] = useState(1);
+  const [displayedStartVertex, setDisplayedStartVertex] = useState(0);
+  const [graphElements, setGraphElements] = useState([]);
 
-  useEffect(() => {
-    let intervals = {};
-    if (isVisualizingPaths && topPathsData.length > 0) {
-      Object.values(intervals).forEach(clearInterval);
+  const networkInstancesRef = useRef([]);
 
-      const initialProgress = {};
-      topPathsData.forEach((path) => {
-        initialProgress[path.name] = 0;
-      });
-      setPathProgress(initialProgress);
-
-      topPathsData.forEach((path) => {
-        const duration = path.time_taken_seconds * 1000;
-        const startTime = Date.now();
-
-        intervals[path.name] = setInterval(() => {
-          const elapsedTime = Date.now() - startTime;
-          let newProgress = (elapsedTime / duration) * 100;
-
-          if (newProgress >= 100) {
-            newProgress = 100;
-            clearInterval(intervals[path.name]);
-          }
-
-          setPathProgress((prev) => {
-            if (prev.hasOwnProperty(path.name)) {
-              return { ...prev, [path.name]: newProgress };
-            }
-            return prev;
-          });
-        }, 50);
-      });
-    } else if (!isVisualizingPaths && Object.keys(pathProgress).length > 0) {
-      const timeout = setTimeout(() => {
-        setPathProgress({});
-        Object.values(intervals).forEach(clearInterval);
-      }, 1000);
-      return () => clearTimeout(timeout);
-    }
-
-    return () => {
-      Object.values(intervals).forEach(clearInterval);
-    };
-  }, [isVisualizingPaths, topPathsData]);
-
-  const getLowest = () => {
+  const getLowest = useCallback(() => {
     if (topPathsData.length === 0) return null;
     const resp = topPathsData.reduce((min, path) => {
       return path.path_length < min.path_length ? path : min;
     }, topPathsData[0]);
-    setLowestPath(resp);
     return resp;
-  };
+  }, [topPathsData]);
+
+  const generateVisElements = useCallback(
+    (pathData, totalNodes) => {
+      const nodes = [];
+      const edges = [];
+      const pathNodes = new Set(pathData.path);
+
+      for (let i = 0; i < totalNodes; i++) {
+        nodes.push({
+          id: `node-${i}`,
+          label: `Node ${i}`,
+          color: pathNodes.has(i) ? "#007bff" : "#666",
+          font: { color: pathNodes.has(i) ? "#fff" : "#000" },
+          shape: "dot",
+          size: 15,
+        });
+      }
+
+      for (let i = 0; i < pathData.path.length - 1; i++) {
+        const sourceNode = pathData.path[i];
+        const targetNode = pathData.path[i + 1];
+        if (typeof sourceNode !== "number" || typeof targetNode !== "number") {
+          console.warn("Invalid node in path:", pathData.path);
+          continue;
+        }
+        edges.push({
+          from: `node-${sourceNode}`,
+          to: `node-${targetNode}`,
+          arrows: "to",
+          color: "#28a745",
+        });
+      }
+      return { nodes, edges };
+    },
+    [displayedStartVertex]
+  );
+
+  useEffect(() => {
+    const newGraphElements = Array.from({ length: 10 }, (_, i) => {
+      const pathData = topPathsData[i];
+      if (pathData) {
+        return {
+          id: pathData.name || `path-${i}`,
+          elements: generateVisElements(pathData, displayedVertexCount),
+          pathInfo: pathData,
+          isEmpty: false,
+        };
+      } else {
+        return {
+          id: `placeholder-${i}`,
+          elements: { nodes: [], edges: [] },
+          pathInfo: { name: `Path ${i + 1}`, path_length: 0, path: [] },
+          isEmpty: true,
+        };
+      }
+    });
+    setGraphElements(newGraphElements);
+  }, [
+    topPathsData,
+    generateVisElements,
+    displayedVertexCount,
+    displayedStartVertex,
+  ]);
 
   const testHamiltonianAccess = async () => {
     setIsApiLoading(true);
-    setIsVisualizingPaths(false);
     setHamiltonianInfo(null);
     setTopPathsData([]);
-    setPathProgress({});
+    setDisplayedVertexCount(vertex_count);
+    setDisplayedStartVertex(start_vertex);
 
     try {
       const response = await hamiltonianAccess.getHamiltonianInfo(
         vertex_count,
         start_vertex
       );
+
       if (response) {
-        setTopPathsData(response.top_paths || []);
-        let formattedPaths = (response.top_paths || [])
+        const receivedTopPaths = response.top_paths || [];
+        setTopPathsData(receivedTopPaths);
+
+        let formattedPaths = receivedTopPaths
           .map(
             (path) =>
               `${path.name}: ${path.path.join(" -> ")}, Longitud: ${
@@ -91,20 +114,19 @@ export default function Hamiltonian() {
           `Tiempo total: ${response.total_time_seconds} seconds\nCantidad de Vertices: ${response.graph_vertices}\nCaminos Encontrados: ${response.total_paths_found}\nTop Caminos:\n${formattedPaths}`
         );
 
-        if (response.top_paths && response.top_paths.length > 0) {
-          const lowestPath = getLowest();
-          if (lowestPath) {
+        if (receivedTopPaths.length > 0) {
+          const lowestPathResult = getLowest();
+          if (lowestPathResult) {
             setHamiltonianInfo(
               (prev) =>
                 `${prev}\n\nCamino más corto:\n${
-                  lowestPath.name
-                }: ${lowestPath.path.join(" -> ")}, Longitud: ${
-                  lowestPath.path_length
+                  lowestPathResult.name
+                }: ${lowestPathResult.path.join(" -> ")}, Longitud: ${
+                  lowestPathResult.path_length
                 }`
             );
           }
         }
-        setIsVisualizingPaths(true);
       } else {
         console.error("No data received from Hamiltonian access.");
       }
@@ -120,10 +142,96 @@ export default function Hamiltonian() {
       setTopPathsData([]);
     } finally {
       setIsApiLoading(false);
-      if (!topPathsData.length) {
-        setIsVisualizingPaths(false);
-      }
     }
+  };
+
+  const visOptions = {
+    layout: {
+      hierarchical: false,
+      improvedLayout: true,
+      randomSeed: undefined,
+    },
+    physics: {
+      enabled: false,
+      stabilization: {
+        enabled: false,
+      },
+    },
+    nodes: {
+      shape: "dot",
+      size: 15,
+      font: {
+        face: "Arial",
+        size: 8,
+        color: "#000",
+        align: "center",
+      },
+      borderWidth: 1,
+      color: {
+        border: "#2B7CE9",
+        background: "#97C2E5",
+      },
+    },
+    edges: {
+      width: 1,
+      arrows: "to",
+      smooth: {
+        enabled: true,
+        type: "dynamic",
+      },
+      font: {
+        size: 6,
+        align: "middle",
+      },
+    },
+    interaction: {
+      navigationButtons: true,
+      zoomView: true,
+      dragNodes: false,
+      dragView: true,
+    },
+  };
+
+  const VisGraph = ({ graphData, options, index }) => {
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+      let network = networkInstancesRef.current[index];
+
+      if (containerRef.current) {
+        const data = {
+          nodes: graphData.elements.nodes,
+          edges: graphData.elements.edges,
+        };
+
+        if (!network) {
+          network = new Network(containerRef.current, data, options);
+          networkInstancesRef.current[index] = network;
+          network.fit();
+        } else {
+          network.setData(data);
+          network.fit();
+        }
+      }
+
+      return () => {
+        if (network) {
+          network.destroy();
+          networkInstancesRef.current[index] = null;
+        }
+      };
+    }, [graphData.id, graphData.elements, options, index]);
+
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          width: "100%",
+          height: "100%",
+          backgroundColor: graphData.isEmpty ? "#f0f0f0" : "transparent",
+        }}
+      ></div>
+    );
   };
 
   return (
@@ -170,32 +278,48 @@ export default function Hamiltonian() {
         </div>
       </div>
 
-      <div className="w-full flex flex-col gap-2">
-        {isVisualizingPaths && topPathsData.length > 0 ? (
-          topPathsData.map((path) => (
-            <div key={path.name} className="flex items-center gap-2">
-              <span className="w-24 text-left text-sm font-medium">
-                {path.name}:
-              </span>
-              <div className="flex-grow h-4 bg-gray-200 rounded-full overflow-hidden w-full">
-                <div
-                  className="h-full bg-green-500 transition-all duration-100 ease-linear"
-                  style={{ width: `${pathProgress[path.name] || 0}%` }}
-                />
-              </div>
-              <span className="flex text-sm text-gray-400 w-fit">
-                {`${(pathProgress[path.name] || 0).toFixed(2)}%`}
-              </span>
+      {isApiLoading && (
+        <div className="text-gray-500 w-full text-center text-xl py-12">
+          Calculando resultados...
+        </div>
+      )}
+      {!isApiLoading && topPathsData.length === 0 && (
+        <div className="text-gray-500 w-full text-center text-xl py-12">
+          Ajusta los parámetros y presiona 'Test' para generar caminos
+          Hamiltonianos.
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mt-8">
+        {graphElements.map((graph, index) => (
+          <div key={graph.id} className="border p-2 rounded shadow-md">
+            <h3 className="flex text-sm font-semibold mb-2 justify-between">
+              {graph.isEmpty ? `Empty Path ${index + 1}` : graph.pathInfo.name}{" "}
+              (Length: {graph.pathInfo.path_length})
+              <button
+                className="text-xs text-blue-500 hover:underline cursor-pointer"
+                onClick={() => {
+                  const path = graph.pathInfo.path.join(" -> ");
+                  alert(`Path: ${path}`);
+                }}
+                disabled={graph.isEmpty}
+              >
+                Expandir
+              </button>
+            </h3>
+            <div
+              style={{
+                width: "100%",
+                height: "200px",
+                border: "1px solid #eee",
+              }}
+            >
+              <VisGraph graphData={graph} options={visOptions} index={index} />
             </div>
-          ))
-        ) : (
-          <div className="text-gray-500 w-full text-center text-xl py-12">
-            {hamiltonianInfo && !isApiLoading
-              ? "Haz clic en 'Test' para iniciar la prueba Hamiltoniana."
-              : "Calculando resultados..."}
           </div>
-        )}
+        ))}
       </div>
+
       <textarea
         className="w-full h-64 p-4 mt-4 border rounded"
         placeholder="Aquí se mostrarán los resultados de la prueba..."
