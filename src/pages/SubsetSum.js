@@ -2,14 +2,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus } from "lucide-react";
 
 
 export default function SubsetSum() {
   const [numbers, setNumbers] = useState([5, 10, 20, 50]);
   const [targetSum, setTargetSum] = useState(75);
   const [newNumber, setNewNumber] = useState("");
+  const [bills, setBills] = useState([]);
+
+  useEffect(() => {
+    initializeBills()
+  }, [numbers])
 
   const addNumber = () => {
     const num = parseInt(newNumber);
@@ -19,7 +25,18 @@ export default function SubsetSum() {
     }
   };
 
+  const initializeBills = () => {
+    const newBills = numbers.map((num, index) => ({
+      value: num,
+      id: index,
+      isSelected: false,
+      isActive: false,
+    }))
+    setBills(newBills)
+  }
+
   return (
+    //Parte de arriba (Se pide y visualiza informacion)
     <div className="max-w-5xl mx-auto p-6 space-y-6">
       <Card className="bg-black-900 border-gray-700">
         <CardHeader>
@@ -70,6 +87,37 @@ export default function SubsetSum() {
           </div>
         </CardContent>
       </Card>
+
+      {/*Parte de abajo (Visualizacion de los billetes)}*/}
+            <div className="flex flex-wrap justify-center gap-4 mb-12">
+              <AnimatePresence>
+                {bills.map((bill) => (
+                  <motion.div
+                    key={bill.id}
+                    className="relative bg-gradient-to-br from-gray-800 to-gray-400 border-2 rounded-lg shadow-lg overflow-hidden"
+                    style={{ width: "140px", height: "70px" }}
+                    initial={{ scale: 0.8, opacity: 0, rotateY: 90 }}
+                    animate={{
+                      scale: bill.isSelected ? 1.05 : 1,
+                      opacity: 1,
+                      rotateY: 0,
+                      y: bill.isSelected ? -15 : 0,
+                      boxShadow: bill.isSelected
+                        ? "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)"
+                        : "0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)",
+                    }}
+                    transition={{ type: "spring",stiffness: 200, damping: 20 }}
+                  >
+                    {/* Diseno */}
+                    <div className="absolute inset-0 p-2 flex flex-col justify-between">
+                      <div className={`text-xs font-bold text-white-800 opacity-80 text-center`}>Banco Central de Honduras</div>
+                      <div className={`text-s font-bold text-white-1000 text-center`}>Lps. {bill.value}</div>
+                    </div>
+
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
     </div>
   )
 }
