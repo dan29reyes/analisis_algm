@@ -8,7 +8,8 @@ app = Flask(__name__)
 CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-C_EXECUTABLE_PATH = os.path.join(BASE_DIR, 'pages', 'api', 'algorithms', 'path_finder')
+C_EXECUTABLE_PATH = os.path.join(BASE_DIR, 'pages', 'api', 'algorithms', 'path_finder.exe')
+C_GRAPH_COLORING_PATH = os.path.join(BASE_DIR, 'pages', 'api', 'algorithms', 'Graph_Coloring.exe')
 
 @app.route('/find-paths', methods=['GET'])
 def find_paths_api():
@@ -55,6 +56,40 @@ def find_paths_api():
             }), 500
     except Exception as e:
         print(f"ERROR: An unexpected server error occurred in Flask: {str(e)}")
+        return jsonify({"status": "error", "message": f"An unexpected server error occurred: {str(e)}"}), 500
+
+@app.route('/graph-coloring', methods=['GET'])
+def graph_coloring_api():
+    try:
+        graph_json = request.args.get('graph')
+        if not graph_json:
+            return jsonify({"status": "error", "message": "Missing 'graph' parameter"}), 400
+        graph = json.loads(graph_json)
+        V = len(graph)
+        if V != 81:
+            return jsonify({"status": "error", "message": "Graph must be 81x81 for Sudoku coloring."}), 400
+        # Acomodar grafo para backend
+        flat_graph = [str(cell) for row in graph for cell in row]
+        input_data = '\n'.join(flat_graph) + '\n'
+        command = [C_GRAPH_COLORING_PATH]
+        print(f"DEBUG: Executing C GraphColoring command: {command}")
+        process = subprocess.run(command, input=input_data, capture_output=True, text=True, check=True)
+        print(f"DEBUG: C GraphColoring STDOUT:\n{process.stdout}")
+        print(f"DEBUG: C GraphColoring STDERR:\n{process.stderr}")
+        return jsonify({"output": process.stdout, "stderr": process.stderr}), 200
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR: C GraphColoring exited with non-zero status ({e.returncode}).")
+        print(f"C GraphColoring STDOUT on error:\n{e.stdout}")
+        print(f"C GraphColoring STDERR on error:\n{e.stderr}")
+        return jsonify({
+            "status": "error",
+            "message": "C GraphColoring execution failed.",
+            "c_stdout": e.stdout,
+            "c_stderr": e.stderr,
+            "return_code": e.returncode
+        }), 500
+    except Exception as e:
+        print(f"ERROR: An unexpected server error occurred in Flask (GraphColoring): {str(e)}")
         return jsonify({"status": "error", "message": f"An unexpected server error occurred: {str(e)}"}), 500
 
 if __name__ == '__main__':
