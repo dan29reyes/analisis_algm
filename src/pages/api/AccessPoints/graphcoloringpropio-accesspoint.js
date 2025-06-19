@@ -3,7 +3,7 @@ import { handleError } from "@/Helpers";
 
 export async function getGraphColoring({ graph, sudoku }) {
   try {
-    const response = await axios.post("http://127.0.0.1:5000/graph-coloring", {
+    const response = await axios.post("http://127.0.0.1:5000/graph-coloring-propio", {
       graph,
       sudoku
     });
