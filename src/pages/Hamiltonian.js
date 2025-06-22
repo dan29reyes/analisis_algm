@@ -26,6 +26,7 @@ import { Switch } from "@headlessui/react";
 // Clan logos
 import republicLogo from "@/assets/logos/republic_logo.png";
 import separatistLogo from "@/assets/logos/separatist_logo.png";
+import { Expand, Clock, Spline } from "lucide-react";
 
 export default function Hamiltonian() {
   const [vertex_count, setVertexCount] = useState(1);
@@ -313,6 +314,16 @@ export default function Hamiltonian() {
     1500,
   ];
 
+  const clearPageData = () => {
+    setHamiltonianInfo(null);
+    setTopPathsData([]);
+    setDisplayedVertexCount(1);
+    setDisplayedStartVertex(0);
+    setGraphElements([]);
+    setIsApiLoading(false);
+    setIsTypingResponse(false);
+  };
+
   return (
     <div
       className={
@@ -350,11 +361,14 @@ export default function Hamiltonian() {
               <div className="flex justify-center gap-2 mt-2">
                 <Switch
                   checked={method !== "pathfinder"}
-                  onChange={() =>
+                  onChange={() => {
                     setMethod((prev) =>
-                      prev === "pathfinder" ? "dijkstra" : "pathfinder"
-                    )
-                  }
+                      prev === "pathfinder"
+                        ? "community_path_finder"
+                        : "pathfinder"
+                    );
+                    clearPageData();
+                  }}
                   className={`${
                     method !== "pathfinder" ? "bg-cyan-950" : "bg-red-950"
                   } relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none cursor-pointer`}
@@ -431,15 +445,17 @@ export default function Hamiltonian() {
                   onClick={() => openDialogWithGraph(graph)}
                   disabled={graph.isEmpty}
                 >
-                  Expandir
+                  Expandir <Expand className="inline h-4 w-4" />
                 </button>
               </h3>
-              <h3 className="flex text-sm font-semibold justify-between">
+              <h3 className="flex text-sm font-semibold py-2">
+                <Clock className="inline h-4 w-4 mr-2" />
                 {graph.isEmpty
                   ? `Sin Tiempo`
                   : "Tiempo " + graph.pathInfo.time_taken_seconds + "s"}
               </h3>
-              <h3 className="flex text-sm font-semibold mb-2 justify-between">
+              <h3 className="flex text-sm font-semibold mb-2">
+                <Spline className="inline h-4 w-4 mr-2" />
                 {graph.isEmpty
                   ? `Sin recorrido`
                   : "Camino: " + graph.pathInfo.path}

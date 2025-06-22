@@ -1,5 +1,6 @@
 import FadeInWhenVisible from "@/components/AnimatedComponent";
 import { Gitlab } from "lucide-react";
+import { TypeAnimation } from "react-type-animation";
 
 export default function Home() {
   const users = [
@@ -28,6 +29,10 @@ export default function Home() {
       url: "SubsetSum",
     },
   ];
+
+  const userSequence = users.flatMap((user, index) => {
+    return [user.name, 1500]; 
+  });
 
   return (
     <div className="flex flex-col items-center justify-center p-8 sm:p-20 min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
@@ -66,18 +71,28 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center pt-8 sm:pt-14">
-        {users.map((user) => (
-          <a
-            className="flex items-center gap-2 hover:underline hover:underline-offset-4 animate-bounce"
-            href={`https://github.com/${user.gitUrl}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Gitlab className="size-4 text-gray-400" />
-            {user.name}
-          </a>
-        ))}
+      <footer className="row-start-3 flex flex-wrap items-center justify-center pt-8 sm:pt-14">
+        <a
+          className="flex items-center hover:underline hover:underline-offset-4 animate-bounce"
+          href={`https://github.com/${users[0].gitUrl}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Gitlab className="size-4 text-gray-400" />
+          <TypeAnimation
+            key={"user-sequence"}
+            sequence={userSequence}
+            wrapper="span"
+            speed={50}
+            repeat={Infinity}
+            style={{
+              display: "inline-block",
+              textAlign: "center",
+              paddingLeft: 20,
+              paddingRight: 20,
+            }}
+          />
+        </a>
       </footer>
     </div>
   );
