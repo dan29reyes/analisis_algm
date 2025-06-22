@@ -4,33 +4,93 @@ import { Badge } from "@/components/ui/badge";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Play, RotateCcw, Lock, Unlock} from "lucide-react";
+import subsetSumAccess from "@/pages/api/AccessPoints/subsetSum-access";
 
 export default function SubsetSum() {
-  const [numbers, setNumbers] = useState([1, 1, 1, 1, 1, 1, 1, 1, 1, 20]);
+  const [numbers, setNumbers] = useState([2, 3, 5, 7]);
   const [targetSum, setTargetSum] = useState(20);
   const [newNumber, setNewNumber] = useState("");
   const [NumberGeneration, setNumberGeneration] = useState("");
   const [bills, setBills] = useState([]);
   const [solution, setSolution] = useState([]);
-  const [currentPath, setCurrentPath] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [currentSum, setCurrentSum] = useState(0);
-  const [recursionStack, setRecursionStack] = useState([]);
   const [solutionFound, setSolutionFound] = useState(false);
   const [message, setMessage] = useState("");
   const [stepCount, setStepCount] = useState(0);
   const [vaultOpen, setVaultOpen] = useState(false);
   const [executionTime, setExecutionTime] = useState(null);
-
+  const [subsetSumInfo, setSubsetSumInfo] = useState(null);
+  const [algorithmType, setAlgorithmType] = useState(1);
   
+  const [backtrackingSteps, setBacktrackingSteps] = useState([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState(-1);
+  const [isVisualizing, setIsVisualizing] = useState(false);
+  const [playSpeed] = useState(600); 
+  const [currentSubset, setCurrentSubset] = useState([]);
+  const [currentTarget, setCurrentTarget] = useState(0);
+  const [currentAction, setCurrentAction] = useState("");
+
   useEffect(() => {
     initializeBills()
   }, [numbers])
 
+  useEffect(() => {
+    let interval;
+    if (isVisualizing && currentStepIndex < backtrackingSteps.length - 1) {
+      interval = setInterval(() => {
+        setCurrentStepIndex(prev => {
+          const nextIndex = prev + 1;
+          if (nextIndex >= backtrackingSteps.length - 1) {
+            setIsVisualizing(false);
+          }
+          return nextIndex;
+        });
+      }, playSpeed);
+    }
+    return () => clearInterval(interval);
+  }, [isVisualizing, currentStepIndex, backtrackingSteps.length, playSpeed]);
+
+  useEffect(() => {
+    if (backtrackingSteps.length > 0 && !isRunning) {
+      setTimeout(() => {
+        setCurrentStepIndex(-1);
+        setIsVisualizing(true);
+      }, 500);
+    }
+  }, [backtrackingSteps, isRunning]);
+
+  useEffect(() => {
+    if (currentStepIndex >= 0 && currentStepIndex < backtrackingSteps.length) {
+      const step = backtrackingSteps[currentStepIndex];
+      updateVisualizationFromStep(step);
+    }
+  }, [currentStepIndex, backtrackingSteps]);
+
+  const updateVisualizationFromStep = (step) => {
+    setCurrentAction(step.action);
+    setCurrentTarget(step.current_target);
+    setCurrentSubset(step.current_subset_values || []);
+    
+    // Actualizar billetes
+    setBills(prevBills => prevBills.map((bill, index) => {
+      const isInCurrentSubset = step.current_subset_indices && step.current_subset_indices.includes(index);
+      const isBeingConsidered = index === step.current_index;
+      
+      return {
+        ...bill,
+        // Verde: Solo para la solución final
+        isSelected: step.action === 'solution' && isInCurrentSubset,
+        // Naranja: TODOS los billetes que están en la combinación actual
+        isActive: isInCurrentSubset && step.action !== 'solution',
+        // Amarillo: Solo el billete específico que se está considerando ahora
+        isconsidering: isBeingConsidered && !isInCurrentSubset && (step.action === 'consider' || step.action === 'exclude'),
+      };
+    }));
+  };
+
   const addNumber = () => {
     const num = parseInt(newNumber);
-    if (!isNaN(num)) {
+    if (!isNaN(num) && num >= 0) {
       setNumbers([...numbers, num]);
       setNewNumber("");
       resetAlgorithm();
@@ -38,7 +98,7 @@ export default function SubsetSum() {
   };
 
   const addRandomNumbers = (count) => {
-    const newNums = Array.from({ length: count }, () => Math.floor(Math.random() * 100));
+    const newNums = Array.from({ length: count }, () => Math.floor(Math.random() * 100) + 1);
     setNumbers([...numbers, ...newNums]);
     resetAlgorithm();
   };
@@ -56,15 +116,19 @@ export default function SubsetSum() {
 
   const resetAlgorithm = () => {
     setSolution([]);
-    setCurrentPath([]);
     setIsRunning(false);
-    setCurrentIndex(0);
-    setCurrentSum(0);
-    setRecursionStack([]);
     setSolutionFound(false);
     setMessage("");
     setStepCount(0);
     setVaultOpen(false);
+    setExecutionTime(null);
+    setSubsetSumInfo(null);
+    setBacktrackingSteps([]);
+    setCurrentStepIndex(-1);
+    setIsVisualizing(false);
+    setCurrentSubset([]);
+    setCurrentTarget(0);
+    setCurrentAction("");
     
     const resetBills = bills.map(bill => ({
       ...bill,
@@ -75,215 +139,150 @@ export default function SubsetSum() {
     setBills(resetBills);
   }
 
-  const sleep = (ms) => {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  const measureExecutionTime = async (nums, target, visualize = true) => {
-    const start = performance.now();
-    const result = await subsetSumRecursive(nums, target, 0, [], visualize);
-    const end = performance.now();
-    const duration = end - start;
-
-    setExecutionTime(duration.toFixed(2)); // ⬅️ Aquí guardamos el tiempo
-    console.log(`Tiempo de ejecución: ${duration.toFixed(2)} ms`);
-    return result;
+  const highlightSolutionBills = (solutionNumbers) => {
+    setBills(prevBills => prevBills.map(bill => ({
+      ...bill,
+      isSelected: solutionNumbers.includes(bill.value),
+      isActive: false,
+      isconsidering: false,
+    })));
   };
 
-  const measureExecutionTimeAprox = async (nums, target, visualize = true) => {
-    const start = performance.now();
-    const result = await subsetSumRecursiveAprox(nums, target, 0, [], visualize);
-    const end = performance.now();
-    const duration = end - start;
-
-    setExecutionTime(duration.toFixed(2)); // ⬅️ Aquí guardamos el tiempo
-    console.log(`Tiempo de ejecución: ${duration.toFixed(2)} ms`);
-    return result;
-  }
-
-  const subsetSumRecursive = async (nums, target, index = 0, currentSubset = [], visualize = true) => {
-    setStepCount(prev => prev + 1);
-
-    if (visualize) {
-      setCurrentIndex(index);
-      setCurrentSum(currentSubset.reduce((sum, idx) => sum + nums[idx], 0));
-      setCurrentPath(currentSubset.map(i => nums[i]));
-      setRecursionStack(prev => [...prev, { index, target, subset: [...currentSubset] }]);
-
-      setBills(prevBills => prevBills.map((bill, i) => ({
-        ...bill,
-        isActive: i === index,
-        isconsidering: i === index,
-        isSelected: currentSubset.includes(i), // usamos el índice
-      })));
-
-      await sleep(600);
-    }
-
-    if (target === 0) {
-      if (visualize) {
-        setSolutionFound(true);
-        setVaultOpen(true);
-        setMessage("¡Combinación correcta! Boveda desbloqueada");
-        setSolution(currentSubset.map(i => nums[i])); // convertir índices a valores
-      }
-      return true;
-    }
-
-    if (index >= nums.length || target < 0) {
-      if (visualize) {
-        setRecursionStack(prev => prev.slice(0, -1));
-      }
-      return false;
-    }
-
-    // Incluir el billete actual (por índice)
-    const includeResult = await subsetSumRecursive(
-      nums,
-      target - nums[index],
-      index + 1,
-      [...currentSubset, index], // guardamos índice
-      visualize
-    );
-    if (includeResult) {
-      return true;
-    }
-
-    if (visualize) {
-      setBills(prevBills => prevBills.map((bill, i) => ({
-        ...bill,
-        isActive: i === index,
-        isconsidering: i === index,
-        isSelected: currentSubset.includes(i),
-      })));
-      await sleep(600);
-    }
-
-    // Excluir el billete actual
-    const excludeResult = await subsetSumRecursive(
-      nums,
-      target,
-      index + 1,
-      currentSubset,
-      visualize
-    );
-
-    if (visualize) {
-      setRecursionStack(prev => prev.slice(0, -1));
-    }
-
-    return excludeResult;
-  };
-
-  const subsetSumRecursiveAprox = async (nums, target, index = 0, currentSubset = [], visualize = true) => {
-    setStepCount(prev => prev + 1);
-
-    if (target === 0) {
-      if (visualize) {
-        setSolutionFound(true);
-        setVaultOpen(true);
-        setMessage("¡Combinación correcta! Boveda desbloqueada");
-        setSolution(currentSubset.map(i => nums[i]));
-      }
-      return true;
-    }
-
-    if (target < 0 || index >= nums.length) {
-      return false;
-    }
-
-    for (let i = index; i < nums.length; i++) {
-      if (visualize) {
-        setCurrentIndex(i);
-        setCurrentSum(currentSubset.reduce((sum, idx) => sum + nums[idx], 0));
-        setCurrentPath(currentSubset.map(j => nums[j]));
-        setRecursionStack(prev => [...prev, { index: i, target, subset: [...currentSubset] }]);
-
-        setBills(prevBills => prevBills.map((bill, j) => ({
-          ...bill,
-          isActive: j === i,
-          isconsidering: j === i,
-          isSelected: currentSubset.includes(j),
-        })));
-
-        await sleep(600);
-      }
-
-      const newSubset = [...currentSubset, i];
-      const result = await subsetSumRecursiveAprox(nums, target - nums[i], i + 1, newSubset, visualize);
-
-      if (result) return true;
-
-      if (visualize) {
-        setRecursionStack(prev => prev.slice(0, -1));
-      }
-    }
-
-    return false;
-  };
-
-  const startAlgorithm = async () => {
-    if (targetSum < 1 ){
+  const startAlgorithm = async (algorithmType) => {
+    if (targetSum < 1) {
       setMessage("Por favor, ingrese un objetivo válido mayor a 0.");
       return;
-    } 
+    }
 
     setIsRunning(true);
     setStepCount(0);
     setVaultOpen(false);
+    setMessage("");
+    setSolutionFound(false);
+    setSolution([]);
+    setSubsetSumInfo(null);
+    setExecutionTime(null);
+    setBacktrackingSteps([]);
+    setCurrentStepIndex(-1);
+    setIsVisualizing(false);
+    setCurrentTarget(targetSum);
+    setCurrentAction("");
+    
+    // Tipo
+    const algorithmName = algorithmType === 1 ? 'Exacto' : 'Aproximado';
+    setMessage(`Ejecutando Protocolo ${algorithmName}...`);
 
     try {
-      const result = await measureExecutionTime(numbers, targetSum, true);
+      const response = await subsetSumAccess.getSubsetSumInfo(numbers, targetSum, algorithmType);
       
-      if (!result) {
-        setSolutionFound(false);
-        setMessage(`Acceso denegado. No existe combinación para Lps. ${targetSum}. Intentos: ${stepCount}`);
-        setBills(prev => prev.map(bill => ({ 
-          ...bill, 
-          isSelected: false, 
-          isActive: false, 
-          isConsidering: false 
-        })));
+      if (response && response.status === 'success') {
+        setStepCount(response.total_steps);
+        setExecutionTime(response.total_time_seconds * 1000);
+        
+        if (response.backtracking_steps && response.backtracking_steps.length > 0) {
+          setBacktrackingSteps(response.backtracking_steps);
+          setMessage(`Protocolo ${algorithmName} completado. Visualizando ${response.backtracking_steps.length} pasos...`);
+        } else {
+          setMessage(`Protocolo ${algorithmName} completado sin pasos de visualización.`);
+        }
+        
+        let formattedInfo = `Tiempo total: ${response.total_time_seconds} segundos\n`;
+        formattedInfo += `Cantidad de números: ${response.numbers_count}\n`;
+        formattedInfo += `Objetivo: ${response.target_sum}\n`;
+        formattedInfo += `Algoritmo: ${algorithmName}\n`;
+        formattedInfo += `Pasos totales: ${response.total_steps}\n`;
+        formattedInfo += `Pasos de backtracking: ${response.backtracking_steps ? response.backtracking_steps.length : 0}\n`;
+        
+        if (response.solution_found && response.solutions.length > 0) {
+          setSolutionFound(true);
+          setVaultOpen(true);
+          
+          const firstSolution = response.solutions[0];
+          setSolution(firstSolution.subset);
+          
+          formattedInfo += `\nSoluciones encontradas:\n`;
+          response.solutions.forEach((sol, index) => {
+            formattedInfo += `${sol.solution_name}: [${sol.subset.join(', ')}]\n`;
+            formattedInfo += `  Tiempo: ${sol.time_found_seconds}s, Paso: ${sol.step_found}\n`;
+          });
+        } else {
+          setSolutionFound(false);
+          setMessage(`Acceso denegado. No existe combinación para Lps. ${targetSum}. Pasos: ${response.total_steps}`);
+        }
+        
+        setSubsetSumInfo(formattedInfo);
+        
+      } else {
+        setMessage("Error en la respuesta del servidor");
+        console.error("Invalid response:", response);
       }
     } catch (error) {
       setMessage("Error en el sistema de seguridad");
+      console.error("API Error:", error);
     }
 
     setIsRunning(false);
   };
 
-  const startAlgorithmAprox = async () => {
-    if (targetSum < 1 ){
-      setMessage("Por favor, ingrese un objetivo válido mayor a 0.");
-      return;
-    } 
-
-    setIsRunning(true);
-    setStepCount(0);
-    setVaultOpen(false);
-
-    try {
-      const result = await measureExecutionTimeAprox(numbers, targetSum, true);
-      
-      if (!result) {
-        setSolutionFound(false);
-        setMessage(`Acceso denegado. No existe combinación para Lps. ${targetSum}. Intentos: ${stepCount}`);
-        setBills(prev => prev.map(bill => ({ 
-          ...bill, 
-          isSelected: false, 
-          isActive: false, 
-          isConsidering: false 
-        })));
+  const playVisualization = () => {
+    if (backtrackingSteps.length > 0) {
+      setIsPlaying(true);
+      if (currentStepIndex >= backtrackingSteps.length - 1) {
+        setCurrentStepIndex(-1);
       }
-    } catch (error) {
-      setMessage("Error en el sistema de seguridad");
     }
+  };
 
-    setIsRunning(false);
-  }
+  const pauseVisualization = () => {
+    setIsPlaying(false);
+  };
+
+  const stopVisualization = () => {
+    setIsPlaying(false);
+    setCurrentStepIndex(-1);
+    initializeBills();
+    setCurrentSubset([]);
+    setCurrentTarget(targetSum);
+    setCurrentAction("");
+    setConsideringIndex(-1);
+  };
+
+  const stepForward = () => {
+    if (currentStepIndex < backtrackingSteps.length - 1) {
+      setCurrentStepIndex(currentStepIndex + 1);
+    }
+  };
+
+  const stepBackward = () => {
+    if (currentStepIndex > 0) {
+      setCurrentStepIndex(currentStepIndex - 1);
+    }
+  };
+
+  const getBillStyle = (bill) => {
+    if (bill.isSelected && solutionFound) {
+      return 'bg-gradient-to-br from-green-600 via-emerald-600 to-green-800 border-green-300';
+    } else if (bill.isActive) {
+      return 'bg-gradient-to-br from-orange-600 via-orange-500 to-orange-800 border-orange-300';
+    } else if (bill.isconsidering) {
+      return 'bg-gradient-to-br from-yellow-600 via-amber-600 to-yellow-800 border-yellow-300';
+    } else {
+      return 'bg-gradient-to-br from-slate-600 via-zinc-700 to-slate-800 border-slate-500';
+    }
+  };
+
+  const getActionColor = (action) => {
+    switch (action) {
+      case 'consider': return 'text-yellow-400';
+      case 'include': return 'text-blue-400';
+      case 'exclude': return 'text-red-400';
+      case 'backtrack': return 'text-purple-400';
+      case 'solution': return 'text-green-400';
+      default: return 'text-amber-400';
+    }
+  };
 
   return (
-    
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-zinc-900 to-neutral-900 p-6">
       {/*BACKGROUND */}
       <div className="fixed inset-0 opacity-5">
@@ -307,7 +306,7 @@ export default function SubsetSum() {
             </h1>
           </div>
           <p className="text-xl text-amber-200 font-semibold tracking-wide">
-            SISTEMA DE SEGURIDAD AVANZADO • SUBSET SUM PROTOCOL
+            SISTEMA DE SEGURIDAD AVANZADO • SUBSET SUM PROTOCOL • VISUALIZACIÓN AUTOMÁTICA
           </p>
           <div className="w-32 h-1 bg-gradient-to-r from-amber-400 to-yellow-500 mx-auto mt-4 rounded-full"></div>
         </motion.div>
@@ -319,12 +318,12 @@ export default function SubsetSum() {
           transition={{ delay: 1.2 }} 
         >
           <p className="text-amber-400 font-semibold">
-            Situacion Actual del Banco Central de Honduras
+            Situación Actual del Banco Central de Honduras
           </p>
           <p className="text-amber-300 text-sm mt-2">
             Es un viernes por la tarde en el Banco Central de Honduras. De repente, suena la alarma roja en el sistema de seguridad. Un cliente muy importante necesita retirar una cantidad exacta de dinero para una transacción urgente, pero hay un problema: el sistema de seguridad automático se ha activado y solo permitirá el acceso si se encuentra la combinación perfecta de billetes.
             <br />
-            Es por eso que el equipo de seguridad del banco ha implementado un protocolo de verificación recursiva para encontrar la combinación correcta de billetes que sumen exactamente. LLamado "Subset Sum Protocol", este algoritmo busca entre las denominaciones disponibles para desbloquear la boveda y permitir el acceso al cliente.
+            Es por eso que el equipo de seguridad del banco ha implementado un protocolo de verificación recursiva para encontrar la combinación correcta de billetes que sumen exactamente. Llamado "Subset Sum Protocol", este algoritmo busca entre las denominaciones disponibles para desbloquear la bóveda y permitir el acceso al cliente.
           </p>  
         </motion.div>
 
@@ -366,11 +365,9 @@ export default function SubsetSum() {
           </div>
 
           <div className="p-8 space-y-8">
-            {/* Control Panel */}
+            {/* Controles */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Left Panel - Input Controls */}
               <div className="space-y-6">
-                {/* Target Amount */}
                 <div className="bg-gradient-to-br from-slate-700/50 to-zinc-800/50 rounded-2xl p-6 border border-amber-500/20">
                   <label className="text-amber-300 font-semibold mb-3 block flex items-center gap-2">
                     $$ CANTIDAD OBJETIVO (Lps.)
@@ -419,7 +416,7 @@ export default function SubsetSum() {
                 </div>
 
                 <div className="bg-gradient-to-br from-slate-700/50 to-zinc-800/50 rounded-2xl p-6 border border-amber-500/20">
-                  <label className="text-amber-300 font-semibold mb-3 block">AGREGA UNA CANTIDAD ESPECIFICA DE BILLETES</label>
+                  <label className="text-amber-300 font-semibold mb-3 block">AGREGA UNA CANTIDAD ESPECÍFICA DE BILLETES</label>
                   <div className="flex gap-3 mt-4">
                     <Input
                       type="number"
@@ -443,12 +440,14 @@ export default function SubsetSum() {
                   <label className="text-amber-300 font-semibold mb-3 block">ESTADO DEL SISTEMA</label>
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div className="bg-zinc-900/50 rounded-xl p-4 border border-amber-500/20">
-                      <div className="text-amber-400 text-sm">ITERACIÓN</div>
+                      <div className="text-amber-400 text-sm">PASOS</div>
                       <div className="text-2xl font-bold text-amber-100">{stepCount}</div>
                     </div>
                     <div className="bg-zinc-900/50 rounded-xl p-4 border border-amber-500/20">
-                      <div className="text-amber-400 text-sm">SUMA ACTUAL</div>
-                      <div className="text-2xl font-bold text-amber-100">Lps. {currentSum}</div>
+                      <div className="text-amber-400 text-sm">SOLUCIÓN</div>
+                      <div className="text-2xl font-bold text-amber-100">
+                        {solution.length > 0 ? `Lps. ${solution.reduce((a, b) => a + b, 0)}` : '--'}
+                      </div>
                     </div>
                     <div className="bg-zinc-900/50 rounded-xl p-4 border border-amber-500/20">
                       <div className="text-amber-400 text-sm">OBJETIVO</div>
@@ -464,21 +463,21 @@ export default function SubsetSum() {
                   <label className="text-amber-300 font-semibold mb-4 block">CONTROLES DE SEGURIDAD</label>
                   <div className="space-y-4">
                     <Button 
-                      onClick={startAlgorithm} 
+                      onClick={() => startAlgorithm(1)} 
                       className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-4 text-lg border-2 border-green-400 shadow-lg"
                       disabled={isRunning}
                     >
                       <Play className="h-6 w-6 mr-3" />
-                      {isRunning ? 'PROCESANDO...' : 'INICIAR PROTOCOLO #1'}
+                      {isRunning ? 'PROCESANDO...' : 'INICIAR PROTOCOLO EXACTO'}
                     </Button>
 
                     <Button 
-                      onClick={startAlgorithmAprox} 
-                      className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-4 text-lg border-2 border-green-400 shadow-lg"
+                      onClick={() => startAlgorithm(2)} 
+                      className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-4 text-lg border-2 border-blue-400 shadow-lg"
                       disabled={isRunning}
                     >
                       <Play className="h-6 w-6 mr-3" />
-                      {isRunning ? 'PROCESANDO...' : 'INICIAR PROTOCOLO #2'}
+                      {isRunning ? 'PROCESANDO...' : 'INICIAR PROTOCOLO APROXIMADO'}
                     </Button>
                     
                     <Button 
@@ -497,7 +496,7 @@ export default function SubsetSum() {
                   <div className="text-center">
                     <div className="text-purple-300 text-lg mb-2">TIEMPO DE PROCESAMIENTO</div>
                     <div className="text-6xl font-bold text-transparent bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text mb-4">
-                      {isRunning ? '⟳' : executionTime !== null ? `${executionTime} ms` : '--'}
+                      {isRunning ? '⟳' : executionTime !== null ? `${executionTime.toFixed(2)} ms` : '--'}
                     </div>
                     <div className="text-purple-300 text-sm">
                       Último análisis completado
@@ -521,29 +520,6 @@ export default function SubsetSum() {
               </motion.div>
             )}
 
-            {/* CAMINO ACTUAL */}
-            {currentPath.length > 0 && (
-              <motion.div 
-                className="bg-gradient-to-br from-blue-900/30 to-cyan-900/30 rounded-2xl p-6 border-2 border-blue-500/40"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <h3 className="text-blue-300 text-xl font-bold mb-4 flex items-center gap-2">
-                  SECUENCIA ACTUAL
-                </h3>
-                <div className="flex flex-wrap gap-3 items-center">
-                  {currentPath.map((value, index) => (
-                    <Badge key={index} className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-lg px-4 py-2 font-bold border-2 border-blue-400">
-                      Lps. {value}
-                    </Badge>
-                  ))}
-                  <span className="text-blue-200 text-xl font-bold ml-4">
-                    = Lps. {currentPath.reduce((a, b) => a + b, 0)}
-                  </span>
-                </div>
-              </motion.div>
-            )}
-
             {/* VISUALIZACION SOLUCION */}
             {solution.length > 0 && solutionFound && (
               <motion.div 
@@ -554,7 +530,7 @@ export default function SubsetSum() {
               >
                 <h3 className="text-green-300 text-2xl font-bold mb-6 text-center flex items-center justify-center gap-3">
                   <Unlock className="w-8 h-8" />
-                  BOVEDA DESBLOQUEADA! - COMBINACIÓN CORRECTA
+                  BÓVEDA DESBLOQUEADA! - COMBINACIÓN CORRECTA
                 </h3>
                 <div className="flex flex-wrap gap-4 items-center justify-center">
                   {solution.map((value, index) => (
@@ -586,20 +562,30 @@ export default function SubsetSum() {
           transition={{ duration: 0.8, delay: 0.4 }}
         >
           <div className="text-center mb-8">
-            <h3 className="text-3xl font-bold text-amber-100 mb-2">BOVEDA</h3>
+            <h3 className="text-3xl font-bold text-amber-100 mb-2">BÓVEDA - VISUALIZACIÓN EN TIEMPO REAL</h3>
             <p className="text-amber-300">Billetes en custodia del sistema de seguridad</p>
+            {isVisualizing && currentStepIndex >= 0 && (
+              <p className="text-purple-300 font-bold mt-2">
+                🎬 Paso {currentStepIndex + 1} de {backtrackingSteps.length} - Acción: {currentAction.toUpperCase()} | Objetivo restante: Lps. {currentTarget}
+              </p>
+            )}
+            {!isVisualizing && backtrackingSteps.length > 0 && (
+              <p className="text-green-300 font-bold mt-2">
+                ✅ Visualización completada - {backtrackingSteps.length} pasos procesados
+              </p>
+            )}
             <div className="flex justify-center gap-8 mt-4 text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-yellow-500 rounded border border-yellow-300"></div>
-                <span className="text-amber-300">Activo</span>
+                <span className="text-amber-300">Considerando</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-blue-500 rounded border border-blue-300"></div>
-                <span className="text-amber-300">En secuencia</span>
+                <div className="w-4 h-4 bg-orange-500 rounded border border-orange-300"></div>
+                <span className="text-amber-300">Combinación Actual</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-green-500 rounded border border-green-300"></div>
-                <span className="text-amber-300">Solución</span>
+                <span className="text-amber-300">Solución Final</span>
               </div>
             </div>
           </div>
@@ -609,23 +595,15 @@ export default function SubsetSum() {
               {bills.map((bill, index) => (
                 <motion.div
                   key={bill.id}
-                  className={`relative rounded-2xl shadow-2xl overflow-hidden border-4 ${
-                    bill.isSelected && solutionFound
-                      ? 'bg-gradient-to-br from-green-600 via-emerald-600 to-green-800 border-green-300'
-                      : bill.isSelected && !solutionFound
-                      ? 'bg-gradient-to-br from-blue-600 via-cyan-600 to-blue-800 border-blue-300'
-                      : bill.isActive
-                      ? 'bg-gradient-to-br from-yellow-600 via-amber-600 to-yellow-800 border-yellow-300'
-                      : 'bg-gradient-to-br from-slate-600 via-zinc-700 to-slate-800 border-slate-500'
-                  }`}
+                  className={`relative rounded-2xl shadow-2xl overflow-hidden border-4 ${getBillStyle(bill)}`}
                   style={{ width: "180px", height: "90px" }}
                   initial={{ scale: 0.8, opacity: 0, rotateY: 90 }}
                   animate={{
-                    scale: bill.isActive || bill.isSelected ? 1.15 : 1,
+                    scale: bill.isActive || bill.isSelected || bill.isconsidering ? 1.15 : 1,
                     opacity: 1,
                     rotateY: 0,
-                    y: bill.isActive || bill.isSelected ? -15 : 0,
-                    boxShadow: bill.isActive || bill.isSelected
+                    y: bill.isActive || bill.isSelected || bill.isconsidering ? -15 : 0,
+                    boxShadow: bill.isActive || bill.isSelected || bill.isconsidering
                       ? "0 25px 50px -12px rgba(251, 191, 36, 0.4), 0 20px 25px -5px rgba(251, 191, 36, 0.3)"
                       : "0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)",
                   }}
@@ -650,15 +628,16 @@ export default function SubsetSum() {
                       </div>
                     </div>
                     <div className="text-xs text-white opacity-60 text-center">
-                      SISTEMA DE LA BOVEDA
+                      SISTEMA DE LA BÓVEDA
                     </div>
                   </div>
 
                   {/* BORDE SI ESTA ACTIVO */}
-                  {(bill.isActive || bill.isSelected) && (
+                  {(bill.isActive || bill.isSelected || bill.isconsidering) && (
                     <motion.div
                       className={`absolute inset-0 border-4 rounded-2xl ${
-                        bill.isSelected ? 'border-green-200' : 'border-yellow-200'
+                        bill.isSelected ? 'border-green-200' : 
+                        bill.isActive ? 'border-orange-200' : 'border-yellow-200'
                       }`}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: [0, 1, 0] }}
@@ -671,7 +650,7 @@ export default function SubsetSum() {
           </div>
         </motion.div>
 
-        {/* INFO PARTE INFERIOR */}
+
         <motion.div 
           className="text-center py-6 border-t border-amber-500/20"
           initial={{ opacity: 0 }}
@@ -679,7 +658,7 @@ export default function SubsetSum() {
           transition={{ delay: 1 }}
         >
           <p className="text-amber-400 font-semibold">
-            SISTEMA DE SEGURIDAD AVANZADO • SUBSET SUM PROTOCOL
+            SISTEMA DE SEGURIDAD AVANZADO • SUBSET SUM PROTOCOL • VISUALIZACIÓN AUTOMÁTICA
           </p>
         </motion.div>
       </div>
