@@ -113,7 +113,7 @@ def subset_sum():
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=30  # 30 second timeout
+                timeout=1000
             )
             
             print(f"DEBUG: Subset sum STDOUT:\n{result.stdout}")

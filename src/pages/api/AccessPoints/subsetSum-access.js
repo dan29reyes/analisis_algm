@@ -9,7 +9,7 @@ export async function getSubsetSumInfo(numbers, targetSum, algorithm = 1) {
       data: {
         numbers: numbers,
         target: targetSum,
-        algorithm: algorithm // 1 for exact, 2 for approximation
+        algorithm: algorithm
       },
       headers: {
         'Content-Type': 'application/json'
