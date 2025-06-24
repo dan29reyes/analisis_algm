@@ -194,7 +194,8 @@ static void destroyGraph(int num_vertices, bool **graph_matrix)
     free(graph_matrix);
 }
 
-static void printResultsAsJson(int num_vertices, int start_node, int paths_count, double total_execution_time)
+// Modified to include the graph matrix in the JSON output
+static void printResultsAsJson(int num_vertices, int start_node, int paths_count, double total_execution_time, bool **adjacency_matrix)
 {
     qsort(s_top_paths, s_top_paths_count, sizeof(PathRecord), comparePathRecords);
 
@@ -204,6 +205,20 @@ static void printResultsAsJson(int num_vertices, int start_node, int paths_count
     printf("  \"start_vertex\": %d,\n", start_node);
     printf("  \"total_paths_found\": %d,\n", paths_count);
     printf("  \"total_time_seconds\": %.6f,\n", total_execution_time);
+
+    // Adding the generated_graph to the JSON output
+    printf("  \"generated_graph\": [\n");
+    for (int i = 0; i < num_vertices; ++i)
+    {
+        printf("    [");
+        for (int j = 0; j < num_vertices; ++j)
+        {
+            printf("%d%s", adjacency_matrix[i][j] ? 1 : 0, (j == num_vertices - 1) ? "" : ", ");
+        }
+        printf("]%s\n", (i == num_vertices - 1) ? "" : ",");
+    }
+    printf("  ],\n"); // Comma after the graph array
+
     printf("  \"top_paths\": [\n");
 
     for (int i = 0; i < s_top_paths_count; ++i)
@@ -261,7 +276,8 @@ void executePathFinding(int num_vertices, bool **graph_matrix, int start_node)
     clock_t end_time = clock();
     double total_duration = ((double)(end_time - s_global_start_time)) / CLOCKS_PER_SEC;
 
-    printResultsAsJson(num_vertices, start_node, s_total_paths_found, total_duration);
+    // Pass the graph_matrix to the JSON output function
+    printResultsAsJson(num_vertices, start_node, s_total_paths_found, total_duration, graph_matrix);
 
     free(path_buffer);
     cleanupPathRecords();
@@ -291,7 +307,7 @@ int main(int argc, char *argv[])
     if (num_graph_vertices <= 0 || num_graph_vertices > MAX_GRAPH_VERTICES)
     {
         fprintf(stderr, "Invalid number of vertices. Must be between 1 and %d.\n", MAX_GRAPH_VERTICES);
-        printf("{\n  \"status\": \"error\",\n  \"message\": \"Invalid number of vertices. Must be between 1 and %d.\"\n}\n", MAX_GRAPH_VERTICES);
+        printf("{\n  \"status\": \"error\",\n  \"message\": \"Invalid number of vertices. Must be between 1 and %d.\"\n}\n", num_graph_vertices); // Fix: use num_graph_vertices
         return 1;
     }
 
@@ -299,7 +315,7 @@ int main(int argc, char *argv[])
     if (graph == NULL)
     {
         fprintf(stderr, "Failed to generate graph with %d vertices.\n", num_graph_vertices);
-        printf("{\n  \"status\": \"error\",\n  \"message\": \"Failed to generate graph with %d vertices.\"\n}\n");
+        printf("{\n  \"status\": \"error\",\n  \"message\": \"Failed to generate graph with %d vertices.\"\n}\n", num_graph_vertices);
         return 1;
     }
 

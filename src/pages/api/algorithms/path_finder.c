@@ -83,8 +83,8 @@ int comparePaths(const void *a, const void *b)
     return 0;
 }
 
-// THIS FUNCTION NOW OUTPUTS JSON
-void outputJsonResult(int V, int start_vertex, int total_paths_found, double total_time_taken)
+// THIS FUNCTION NOW OUTPUTS JSON AND INCLUDES THE GRAPH
+void outputJsonResult(int V, int start_vertex, int total_paths_found, double total_time_taken, bool **graph) // Added graph parameter
 {
     // Sort the top_paths array by time (descending)
     qsort(top_paths, current_top_paths_count, sizeof(PathData), comparePaths);
@@ -95,6 +95,20 @@ void outputJsonResult(int V, int start_vertex, int total_paths_found, double tot
     printf("  \"start_vertex\": %d,\n", start_vertex);
     printf("  \"total_paths_found\": %d,\n", total_paths_found);
     printf("  \"total_time_seconds\": %.6f,\n", total_time_taken);
+
+    // Add graph representation here
+    printf("  \"generated_graph\": [\n");
+    for (int i = 0; i < V; i++)
+    {
+        printf("    [");
+        for (int j = 0; j < V; j++)
+        {
+            printf("%d%s", graph[i][j] ? 1 : 0, (j == V - 1) ? "" : ", ");
+        }
+        printf("]%s\n", (i == V - 1) ? "" : ",");
+    }
+    printf("  ],\n");
+
     printf("  \"top_paths\": [\n");
 
     for (int i = 0; i < current_top_paths_count; i++)
@@ -234,7 +248,7 @@ void findAllSimplePaths(int V, bool **graph, int start_vertex)
     clock_t total_end_time = clock();
     double total_time_taken = ((double)(total_end_time - global_start_time)) / CLOCKS_PER_SEC;
 
-    outputJsonResult(V, start_vertex, total_paths_found_count, total_time_taken);
+    outputJsonResult(V, start_vertex, total_paths_found_count, total_time_taken, graph);
 
     free(current_path);
     freeTopPaths();
