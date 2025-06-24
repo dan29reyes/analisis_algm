@@ -10,6 +10,7 @@ CORS(app)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 C_EXECUTABLE_PATH = os.path.join(BASE_DIR, 'pages', 'api', 'algorithms', 'path_finder.exe')
 C_GRAPH_COLORING_PATH = os.path.join(BASE_DIR, 'pages', 'api', 'algorithms', 'Graph_Coloring_Comunidad.exe')
+C_GRAPH_COLORING_PATH_PROPIO = os.path.join(BASE_DIR, 'pages', 'api', 'algorithms', 'Graph_Coloring_Propio.exe')
 
 @app.route('/find-paths', methods=['GET'])
 def find_paths_api():
@@ -108,15 +109,11 @@ def graph_coloring_propio_api():
         graph = data['graph']
         sudoku = data['sudoku']
 
-        if len(graph) != 81 or any(len(row) != 81 for row in graph):
-            return jsonify({"status": "error", "message": "Graph must be 81x81."}), 400
-        if len(sudoku) != 81:
-            return jsonify({"status": "error", "message": "Sudoku must contain 81 values."}), 400
         sudoku_line = ' '.join(map(str, sudoku)) + '\n'
         graph_lines = '\n'.join(' '.join(map(str, row)) for row in graph) + '\n'
         input_data = sudoku_line + graph_lines
 
-        command = [C_GRAPH_COLORING_PATH]
+        command = [C_GRAPH_COLORING_PATH_PROPIO]
         print(f"DEBUG: Executing C GraphColoring command: {command}")
         process = subprocess.run(command, input=input_data, capture_output=True, text=True, check=True)
         print(f"DEBUG: C GraphColoring STDOUT:\n{process.stdout}")

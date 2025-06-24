@@ -50,7 +50,7 @@ bool graphColoring(int graph[V][V], int m, int color[]) {
         printf("No se pudo resolver el Sudoku.\n");
     }
 
-    printf("Tiempo de resolución: %.6f segundos\n", time_spent);
+    printf("Tiempo de resolucion: %.6f segundos\n", time_spent);
     return result;
 }
 
@@ -77,6 +77,6 @@ int main() {
     }
 
     graphColoring(graph, 9, color);
-
+    
     return 0;
 }
