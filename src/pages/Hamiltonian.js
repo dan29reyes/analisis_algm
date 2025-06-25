@@ -6,7 +6,8 @@ import HamiltonianDialog from "@/components/hamiltonianModal";
 import Image from "next/image";
 import { TypeAnimation } from "react-type-animation";
 
-//planets
+import GraphDisplayDialog from "@/components/OriginalGraphDialog";
+
 import alderaan from "@/assets/planets/planet_alderaan.png";
 import balmorra from "@/assets/planets/planet_balmorra.png";
 import belsavis from "@/assets/planets/planet_belsavis.png";
@@ -23,7 +24,6 @@ import voss from "@/assets/planets/planet_voss.png";
 import deathstar from "@/assets/planets/Death_Star.webp";
 import { Switch } from "@headlessui/react";
 
-// Clan logos
 import republicLogo from "@/assets/logos/republic_logo.png";
 import separatistLogo from "@/assets/logos/separatist_logo.png";
 import { Expand, Clock, Spline } from "lucide-react";
@@ -42,6 +42,10 @@ export default function Hamiltonian() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogGraphData, setDialogGraphData] = useState(null);
+
+  const [isOriginalMatrixDialogOpen, setIsOriginalMatrixDialogOpen] =
+    useState(false);
+  const [originalGraphMatrix, setOriginalGraphMatrix] = useState(null);
 
   const starMap =
     "https://images.unsplash.com/photo-1616712134411-6b6ae89bc3ba?fm=jpg&q=60&w=3000&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8c3BhY2UlMjBzdGFyc3x8ZW58MHx8MHx8fDA%3D";
@@ -140,6 +144,7 @@ export default function Hamiltonian() {
     setIsTypingResponse(false);
     setHamiltonianInfo(null);
     setTopPathsData([]);
+    setOriginalGraphMatrix(null);
     setDisplayedVertexCount(vertex_count);
     setDisplayedStartVertex(start_vertex);
 
@@ -153,6 +158,9 @@ export default function Hamiltonian() {
       if (response) {
         const receivedTopPaths = response.top_paths || [];
         setTopPathsData(receivedTopPaths);
+        if (response.generated_graph) {
+          setOriginalGraphMatrix(response.generated_graph);
+        }
 
         let formattedPaths = receivedTopPaths
           .map(
@@ -194,6 +202,7 @@ export default function Hamiltonian() {
       );
       setIsTypingResponse(true);
       setTopPathsData([]);
+      setOriginalGraphMatrix(null);
     } finally {
       setIsApiLoading(false);
     }
@@ -297,6 +306,10 @@ export default function Hamiltonian() {
     setIsDialogOpen(true);
   };
 
+  const openOriginalMatrixDialog = () => {
+    setIsOriginalMatrixDialogOpen(true);
+  };
+
   const genericLoadingSequence = [
     "Calculando el camino más óptimo...",
     1500,
@@ -322,6 +335,7 @@ export default function Hamiltonian() {
     setGraphElements([]);
     setIsApiLoading(false);
     setIsTypingResponse(false);
+    setOriginalGraphMatrix(null);
   };
 
   return (
@@ -389,40 +403,51 @@ export default function Hamiltonian() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <label className="flex flex-col">
-              <span className="text-base">Número de vértices:</span>
-              <input
-                type="number"
-                min={1}
-                value={vertex_count}
-                onChange={(e) => setVertexCount(Number(e.target.value))}
-                className="p-2 border rounded"
-              />
-            </label>
-            <label className="flex flex-col">
-              <span className="text-base">Vértice de inicio:</span>
-              <input
-                type="number"
-                min={0}
-                value={start_vertex}
-                onChange={(e) => setStartVertex(Number(e.target.value))}
-                className="p-2 border rounded"
-              />
-            </label>
-            <button
-              className="px-8 py-2 mt-6 bg-gray-50 text-black rounded hover:bg-gray-200 transition-colors cursor-pointer h-fit"
-              onClick={testHamiltonianAccess}
-              disabled={isApiLoading}
-            >
-              Test
-            </button>
-            <Image
-              src={method !== "pathfinder" ? republicLogo : separatistLogo}
-              alt="Logo"
-              className="h-24 w-28"
-            />
+          <div className="flex flex-col items-start gap-4">
+            <div className="flex gap-2 w-full">
+              <label className="flex flex-col">
+                <span className="text-base">Número de vértices:</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={vertex_count}
+                  onChange={(e) => setVertexCount(Number(e.target.value))}
+                  className="p-2 border rounded"
+                />
+              </label>
+              <label className="flex flex-col">
+                <span className="text-base">Vértice de inicio:</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={start_vertex}
+                  onChange={(e) => setStartVertex(Number(e.target.value))}
+                  className="p-2 border rounded"
+                />
+              </label>
+            </div>
+            <div className="flex gap-2 w-full">
+              <button
+                className="px-8 py-2 bg-gray-50 text-black rounded hover:bg-gray-200 transition-colors cursor-pointer h-fit w-1/2"
+                onClick={testHamiltonianAccess}
+                disabled={isApiLoading}
+              >
+                Test
+              </button>
+              <button
+                className="px-8 py-2 bg-gray-50 text-black rounded hover:bg-gray-200 transition-colors cursor-pointer h-fit w-1/2"
+                onClick={openOriginalMatrixDialog}
+                disabled={!originalGraphMatrix || isApiLoading}
+              >
+                Ver Original
+              </button>
+            </div>
           </div>
+          <Image
+            src={method !== "pathfinder" ? republicLogo : separatistLogo}
+            alt="Logo"
+            className="h-24 w-28"
+          />
         </div>
       </FadeInWhenVisible>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-8">
@@ -483,7 +508,7 @@ export default function Hamiltonian() {
         </div>
 
         <div
-          className={`h-full p-4 border-2 col-span-1 border-black rounded-md overflow-auto whitespace-pre-wrap ${
+          className={`h-fit p-4 border-2 col-span-1 border-black rounded-md overflow-auto whitespace-pre-wrap ${
             method === "pathfinder"
               ? "bg-red-950 text-red-500"
               : "bg-cyan-950 text-cyan-500"
@@ -553,6 +578,12 @@ export default function Hamiltonian() {
           </div>
         )}
       </HamiltonianDialog>
+
+      <GraphDisplayDialog
+        isOpen={isOriginalMatrixDialogOpen}
+        onClose={() => setIsOriginalMatrixDialogOpen(false)}
+        graphMatrix={originalGraphMatrix}
+      />
     </div>
   );
 }
