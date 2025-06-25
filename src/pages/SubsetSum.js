@@ -207,7 +207,7 @@ export default function SubsetSum() {
           });
         } else {
           setSolutionFound(false);
-          setMessage(`Acceso denegado. No existe combinación para Lps. ${targetSum}. Pasos: ${response.total_steps}`);
+          setMessage(`Acceso denegado. No existe combinación para Lps. ${targetSum}`);
         }
         
         setSubsetSumInfo(formattedInfo);
@@ -438,11 +438,7 @@ export default function SubsetSum() {
                 {/* ESTADO ACTUAL  */}
                 <div className="bg-gradient-to-br from-slate-700/50 to-zinc-800/50 rounded-2xl p-6 border border-amber-500/20">
                   <label className="text-amber-300 font-semibold mb-3 block">ESTADO DEL SISTEMA</label>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div className="bg-zinc-900/50 rounded-xl p-4 border border-amber-500/20">
-                      <div className="text-amber-400 text-sm">PASOS</div>
-                      <div className="text-2xl font-bold text-amber-100">{stepCount}</div>
-                    </div>
+                  <div className="grid grid-cols-2 gap-4 text-center">
                     <div className="bg-zinc-900/50 rounded-xl p-4 border border-amber-500/20">
                       <div className="text-amber-400 text-sm">SOLUCIÓN</div>
                       <div className="text-2xl font-bold text-amber-100">
@@ -564,16 +560,6 @@ export default function SubsetSum() {
           <div className="text-center mb-8">
             <h3 className="text-3xl font-bold text-amber-100 mb-2">BÓVEDA - VISUALIZACIÓN EN TIEMPO REAL</h3>
             <p className="text-amber-300">Billetes en custodia del sistema de seguridad</p>
-            {isVisualizing && currentStepIndex >= 0 && (
-              <p className="text-purple-300 font-bold mt-2">
-                🎬 Paso {currentStepIndex + 1} de {backtrackingSteps.length} - Acción: {currentAction.toUpperCase()} | Objetivo restante: Lps. {currentTarget}
-              </p>
-            )}
-            {!isVisualizing && backtrackingSteps.length > 0 && (
-              <p className="text-green-300 font-bold mt-2">
-                ✅ Visualización completada - {backtrackingSteps.length} pasos procesados
-              </p>
-            )}
             <div className="flex justify-center gap-8 mt-4 text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-yellow-500 rounded border border-yellow-300"></div>
