@@ -10,6 +10,8 @@ CORS(app)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 C_EXECUTABLE_PATHFINDER = os.path.join(BASE_DIR, 'pages', 'api', 'algorithms', 'path_finder')
 C_EXECUTABLE_COMMUNITY_PATH_FINDER = os.path.join(BASE_DIR, 'pages', 'api', 'algorithms', 'community_path_finder')
+C_GRAPH_COLORING_PATH = os.path.join(BASE_DIR, 'pages', 'api', 'algorithms', 'Graph_Coloring_Comunidad')
+C_GRAPH_COLORING_PATH_PROPIO = os.path.join(BASE_DIR, 'pages', 'api', 'algorithms', 'Graph_Coloring_Propio')
 
 # Add path for subset_sum executable
 SUBSET_SUM_PATH = os.path.join(BASE_DIR, 'pages', 'api', 'algorithms', 'subset_sum')
